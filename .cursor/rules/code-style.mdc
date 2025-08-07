@@ -1,0 +1,48 @@
+---
+alwaysApply: true
+---
+
+# Code Style & Patterns
+
+# Core Design Philosophy
+
+## Fundamental Principles
+
+- **Complexity is the enemy**: Try to fix things at the cause, not the symptom
+- **Measure twice, cut once**: Think before coding, design before implementing
+- **Deep modules**: Design for modules that offer a lot of functionality through a simple interface
+- **Working code isn't enough**: Code should be designed for ease of reading, not ease of writing
+- **Information hiding**: Hide implementation details behind clean interfaces
+- **Design it twice**: Consider multiple approaches before implementing
+- **Descriptive names**: Names should reflect conceptual meaning, not implementation
+- **No side effects**: Functions should not have hidden behaviors
+- **Program into your language**: Use JavaScript idioms, don't fight the language
+- **Defensive programming**: Validate inputs, handle edge cases gracefully
+- **Loose coupling, high cohesion**: Minimize dependencies between modules
+- **Design for change**: Make code easy to modify and extend
+- **Iterative refinement**: Improve code through multiple passes
+- **Favor clear code over clever code**: Optimize for readability
+- **Design for testability**: Make code easy to test in isolation
+
+## Formatting Rules
+
+- **Quotes**: Use double quotes (`"`) for strings
+- **Indentation**: 4 spaces (configured in Prettier)
+- **Semicolons**: Required (Prettier enforced)
+- **Line Length**: No strict limit, use judgment for readability
+
+## Naming Conventions
+
+### Files & Directories
+
+- **Files**: Use kebab-case for multi-word files (`user-auth.js`)
+
+### Variables & Functions
+
+- **Constants**: Use UPPER_SNAKE_CASE
+- **Private methods**: Prefix with underscore
+
+### Classes & Modules
+
+- **Classes**: Use PascalCase
+- **Module exports**: Use descriptive names matching functionality

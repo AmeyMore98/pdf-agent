@@ -4,10 +4,9 @@ A Python agent for processing and analyzing PDF documents.
 
 ## Features
 
-- Extract text from PDF files
-- Parse and analyze PDF content
-- Command-line interface for easy usage
-- Extensible architecture for custom processing
+- Extract text from PDF files and generate embeddings
+- Store embeddings in PostgreSQL with pgvector for similarity search
+- Command-line interface for processing and searching
 
 ## Installation
 
@@ -29,8 +28,11 @@ pip install -e .
 ### Command Line Interface
 
 ```bash
-# Basic usage
-pdf-agent process document.pdf
+# Process PDF and store embeddings
+pdf-agent process-pdf document.pdf --db-url postgresql://user:pass@host/db
+
+# Search for similar content
+pdf-agent search "machine learning" --db-url postgresql://user:pass@host/db
 
 # Get help
 pdf-agent --help
@@ -39,11 +41,31 @@ pdf-agent --help
 ### Python API
 
 ```python
-from pdf_agent import PDFProcessor
+from pdf_agent.core import PDFParser, EmbeddingProcessor
 
-processor = PDFProcessor()
-text = processor.extract_text("document.pdf")
-print(text)
+# Parse PDF and process embeddings
+parser = PDFParser()
+page_texts = parser.parse("document.pdf")
+
+processor = EmbeddingProcessor(db_url="postgresql://user:pass@host/db")
+chunks = processor.process_pdf_pages(page_texts, document_path="document.pdf")
+
+# Search for similar content
+results = processor.search_similar("machine learning")
+```
+
+## Setup
+
+Install PostgreSQL with pgvector extension:
+
+```bash
+# Run PostgreSQL with pgvector
+docker run --name pdf-agent-postgres \
+  -e POSTGRES_DB=pdf_agent \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=password \
+  -p 5432:5432 \
+  -d pgvector/pgvector:pg16
 ```
 
 ## Development
