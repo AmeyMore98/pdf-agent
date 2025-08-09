@@ -2,8 +2,7 @@
 
 import click
 import os
-from .core.pdf_parser import PDFParser
-from .core import EmbeddingService
+from .domain import DocumentService
 
 
 @click.group()
@@ -17,33 +16,30 @@ db_url = "postgresql://root:root@localhost:5432/pdf_agent"
 
 @main.command()
 @click.argument('pdf_path', type=click.Path(exists=True))
-@click.option('--chunk-size', default=200, help='Number of tokens per chunk (max depends on model, typically 256-512)')
-@click.option('--overlap-size', default=25, help='Number of overlapping tokens between chunks')
+@click.option('--chunk-size', default=1000, help='Number of characters per chunk')
+@click.option('--overlap-size', default=20, help='Number of overlapping characters between chunks')
 def process_pdf(pdf_path, chunk_size, overlap_size):
     """Process a PDF file and generate embeddings."""
     try:
-        # Parse PDF
-        click.echo(f"Parsing PDF: {pdf_path}")
-        parser = PDFParser()
-        page_texts = parser.parse(pdf_path)
-        click.echo(f"Found {len(page_texts)} pages")
+        click.echo(f"Processing PDF: {pdf_path}")
 
-        # Initialize embedding service
-        service = EmbeddingService(db_url=db_url)
+        # Initialize document service
+        service = DocumentService(db_url=db_url)
 
-        # Process pages into chunks with embeddings
+        # Process and store document
         document_path = os.path.abspath(pdf_path)
-        chunks = service.process_and_store_pdf(
-            page_texts=page_texts,
-            document_path=document_path,
+        stats = service.process_and_store_document(
+            file_path=document_path,
             chunk_size=chunk_size,
             overlap_size=overlap_size
         )
 
         # Print results
-        click.echo(f"Generated {len(chunks)} chunks")
-        for chunk in chunks:
-            click.echo(f"Chunk: page {chunk.page}, {chunk.token_count} tokens")
+        click.echo(f"Processing completed:")
+        click.echo(f"  - Pages processed: {stats.pages_processed}")
+        click.echo(f"  - Chunks created: {stats.chunks_created}")
+        click.echo(f"  - Embeddings generated: {stats.embeddings_generated}")
+        click.echo(f"  - Processing time: {stats.processing_time_seconds:.2f}s")
 
         service.close()
 
@@ -58,14 +54,17 @@ def process_pdf(pdf_path, chunk_size, overlap_size):
 def search(query, limit):
     """Search for similar text chunks."""
     try:
-        service = EmbeddingService(db_url=db_url)
-        results = service.search_similar(query, limit)
+        service = DocumentService(db_url=db_url)
+        results = service.search_documents(query, limit)
 
         if not results:
             click.echo("No results found.")
         else:
+            click.echo(f"Found {len(results)} results for '{query}':")
             for i, result in enumerate(results, 1):
-                click.echo(f"{i}. {result['similarity']:.3f} - {result['text'][:100]}...")
+                click.echo(f"{i}. [Score: {result.similarity_score:.3f}] {result.preview_text}")
+                click.echo(f"   Source: {result.chunk.document_path} (page {result.chunk.page_number})")
+                click.echo()
 
         service.close()
 

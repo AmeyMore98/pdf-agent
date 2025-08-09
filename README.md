@@ -41,17 +41,24 @@ pdf-agent --help
 ### Python API
 
 ```python
-from pdf_agent.core import PDFParser, EmbeddingProcessor
+from pdf_agent import DocumentService
 
-# Parse PDF and process embeddings
-parser = PDFParser()
-page_texts = parser.parse("document.pdf")
+# Initialize the service
+service = DocumentService(db_url="postgresql://user:pass@host/db")
 
-processor = EmbeddingProcessor(db_url="postgresql://user:pass@host/db")
-chunks = processor.process_pdf_pages(page_texts, document_path="document.pdf")
+# Process and store a PDF document
+stats = service.process_and_store_document("document.pdf")
+print(f"Processed {stats.chunks_created} chunks in {stats.processing_time_seconds:.2f}s")
 
 # Search for similar content
-results = processor.search_similar("machine learning")
+results = service.search_documents("machine learning")
+for result in results:
+    print(f"Score: {result.similarity_score:.3f}")
+    print(f"Text: {result.preview_text}")
+    print(f"Source: {result.chunk.document_path} (page {result.chunk.page_number})")
+
+# Clean up
+service.close()
 ```
 
 ## Setup

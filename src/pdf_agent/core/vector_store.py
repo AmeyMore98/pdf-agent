@@ -49,9 +49,14 @@ class VectorStore:
         except psycopg2.Error as e:
             raise RuntimeError(f"Failed to create table: {e}")
 
-    def store_embeddings(self, document_path: str, chunks_with_embeddings: List[Any]):
-        """Store embeddings for a document in the database."""
-        if not chunks_with_embeddings:
+    def store_embeddings(self, document_path: str, chunks: List[Any]):
+        """Store embeddings for a document in the database.
+
+        Args:
+            document_path: Path to the document
+            chunks: List of objects with text, embedding, and page_number attributes
+        """
+        if not chunks:
             return
 
         try:
@@ -59,21 +64,30 @@ class VectorStore:
                 cursor.execute("DELETE FROM embeddings WHERE document_path = %s", (document_path,))
 
                 insert_data = []
-                for chunk in chunks_with_embeddings:
+                for chunk in chunks:
+                    # Skip chunks without embeddings
+                    if not hasattr(chunk, 'embedding') or chunk.embedding is None:
+                        continue
+
                     # Convert numpy array to pgvector format string
                     vector_str = f"[{','.join(map(str, chunk.embedding.tolist()))}]"
+
+                    # Handle different attribute names for page number
+                    page_num = getattr(chunk, 'page_number', getattr(chunk, 'page', 1))
+
                     insert_data.append((
                         document_path,
                         chunk.text,
                         vector_str,
-                        chunk.page,
+                        page_num,
                     ))
 
-                execute_values(
-                    cursor,
-                    "INSERT INTO embeddings (document_path, text, embedding, page) VALUES %s",
-                    insert_data
-                )
+                if insert_data:
+                    execute_values(
+                        cursor,
+                        "INSERT INTO embeddings (document_path, text, embedding, page) VALUES %s",
+                        insert_data
+                    )
         except psycopg2.Error as e:
             raise RuntimeError(f"Failed to store embeddings: {e}")
 

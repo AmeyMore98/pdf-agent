@@ -1,16 +1,14 @@
 """Text processing with sentence-transformers for embeddings."""
 
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from typing import List, Dict, Any, Optional, NamedTuple
 from langchain_core.documents import Document
 import numpy as np
 import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-@dataclass
-class ChunkWithEmbedding:
-    """A text chunk with its embedding and metadata."""
+class ProcessedChunk(NamedTuple):
+    """A simple data structure for processed text chunks."""
     text: str
     embedding: np.ndarray
     page: int
@@ -29,16 +27,15 @@ class EmbeddingProcessor:
 
         self.model = SentenceTransformer(model_name)
 
-
     def process_pdf_pages(
         self,
         page_texts: List[Document],
         chunk_size: int = 1000,
         overlap_size: int = 20
-    ) -> List[ChunkWithEmbedding]:
+    ) -> List[ProcessedChunk]:
         """
         Use splitter to split each page into chunks.
-        Create a ChunkWithEmbedding for each chunk with metadata from the page.
+        Create a ProcessedChunk for each chunk with metadata from the page.
         """
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
@@ -46,22 +43,21 @@ class EmbeddingProcessor:
             separators=["\n\n", "\n", " ", ""],
         )
 
-        chunks_with_embeddings = []
+        processed_chunks = []
 
         for page_doc in page_texts:
             # Split the page content into chunks
             page_chunks = splitter.split_text(page_doc.page_content)
             page_number = page_doc.metadata.get('page', 0)
 
-            # Create ChunkWithEmbedding for each chunk
+            # Create ProcessedChunk for each chunk
             for chunk_text in page_chunks:
-                chunk_with_embedding = ChunkWithEmbedding(
+                processed_chunk = ProcessedChunk(
                     text=chunk_text,
                     embedding=self.model.encode(chunk_text),
                     page=page_number + 1,
                     token_count=len(chunk_text.split()),
                 )
-                chunks_with_embeddings.append(chunk_with_embedding)
+                processed_chunks.append(processed_chunk)
 
-
-        return chunks_with_embeddings
+        return processed_chunks
