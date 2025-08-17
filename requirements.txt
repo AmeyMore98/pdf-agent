@@ -1,8 +1,6 @@
-pypdf2>=3.0.0
-pdfplumber>=0.9.0
-requests>=2.28.0
-click>=8.0.0
-tiktoken>=0.9.0
-sentence-transformers>=2.2.0
-psycopg2-binary>=2.9.0
-pgvector>=0.2.0
+click
+psycopg2-binary
+numpy
+langchain-community
+langchain-text-splitters
+sentence-transformers
