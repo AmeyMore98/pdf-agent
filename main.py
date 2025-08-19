@@ -10,6 +10,7 @@ from psycopg2.extras import execute_values
 import numpy as np
 from langchain_community.document_loaders.pdf import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from llm import rag_search
 
 # Configuration
 DB_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/pdf_agent")
@@ -226,6 +227,33 @@ def search(query, limit):
                 click.echo(f"{i}. [Score: {result['similarity']:.3f}] {result['preview']}")
                 click.echo(f"   Source: {result['document_path']} (page {result['page']})")
                 click.echo()
+
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+@cli.command()
+@click.argument('query', type=str)
+@click.option('--limit', default=5, help='Maximum chunks to retrieve')
+@click.option('--model', default='gpt-3.5-turbo', help='OpenAI model to use')
+def answer(query, limit, model):
+    """Get an AI-generated answer based on your PDF documents."""
+    try:
+        result = rag_search(search_documents, query, limit, model)
+
+        click.echo(f"\nQuestion: {result['query']}")
+        click.echo("=" * 50)
+        click.echo(f"\nAnswer: {result['answer']}\n")
+        click.echo("=" * 50)
+
+        if result['sources']:
+            click.echo("Sources:")
+            for i, source in enumerate(result['sources'], 1):
+                click.echo(f"{i}. {source['document_path']} (page {source['page']}) - Similarity: {source['similarity']:.3f}")
+                click.echo(f"   Preview: {source['preview']}")
+                click.echo()
+        else:
+            click.echo("No sources found.")
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
