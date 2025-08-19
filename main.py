@@ -15,7 +15,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 DB_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/pdf_agent")
 MODEL_NAME = "all-MiniLM-L6-v2"
 CHUNK_SIZE = 1000
-OVERLAP_SIZE = 20
+OVERLAP_SIZE = 100
 
 # Global model - loaded once
 _model = None
@@ -47,9 +47,12 @@ def setup_database():
             );
         """)
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS embeddings_embedding_idx
-            ON embeddings USING ivfflat (embedding vector_cosine_ops);
+            CREATE INDEX embeddings_embedding_idx
+            ON embeddings USING hnsw (embedding vector_cosine_ops)
+            WITH (m = 16, ef_construction = 64);
         """)
+
+
     conn.close()
 
 def normalize_text(text: str) -> str:
@@ -72,7 +75,7 @@ def process_pdf(pdf_path: str, chunk_size: int = CHUNK_SIZE, overlap_size: int =
 
     # Load PDF
     loader = PyMuPDFLoader(pdf_path)
-    documents = loader.load_and_split()
+    documents = loader.load()
 
     # Split into chunks
     splitter = RecursiveCharacterTextSplitter(
@@ -83,19 +86,34 @@ def process_pdf(pdf_path: str, chunk_size: int = CHUNK_SIZE, overlap_size: int =
 
     chunks = []
     model = get_model()
+    all_texts = []
+    all_pages = []
 
     for doc in documents:
-        page_chunks = splitter.split_text(doc.page_content)
         page_number = doc.metadata.get('page', 0) + 1
 
-        for chunk_text in page_chunks:
-            normalized_chunk_text = normalize_text(chunk_text)
-            embedding = model.encode(normalized_chunk_text)
+        for chunk_text in splitter.split_text(doc.page_content):
+            normalized = normalize_text(chunk_text)
+            all_texts.append(normalized)
+            all_pages.append(page_number)
+
+    # batch encode once
+    if all_texts:
+        embs = model.encode(
+            all_texts,
+            batch_size=64,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+            normalize_embeddings=True,   # good for cosine similarity
+        ).astype(np.float32)
+
+        for text, page, vec in zip(all_texts, all_pages, embs):
             chunks.append({
-                'text': normalized_chunk_text,
-                'embedding': embedding,
-                'page': page_number
+                'text': text,
+                'embedding': vec,
+                'page': page
             })
+
 
     # Store in database
     conn = psycopg2.connect(DB_URL)
