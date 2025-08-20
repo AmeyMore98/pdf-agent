@@ -12,6 +12,9 @@ from langchain_community.document_loaders.pdf import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from llm import rag_search
 
+# Prevent tokenizers parallelism warning when forking processes
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # Configuration
 DB_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/pdf_agent")
 MODEL_NAME = "all-MiniLM-L6-v2"
