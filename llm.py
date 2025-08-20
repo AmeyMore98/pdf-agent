@@ -6,6 +6,7 @@ from openai import OpenAI
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DEFAULT_MODEL = "gpt-4o-mini"
 
 # Global client - loaded once
 _openai_client = None
@@ -19,7 +20,7 @@ def get_openai_client():
         _openai_client = OpenAI(api_key=OPENAI_API_KEY)
     return _openai_client
 
-def generate_answer(query: str, retrieved_chunks: List[Dict[str, Any]], model: str = "gpt-4o-mini-2024-07-18") -> str:
+def generate_answer(query: str, retrieved_chunks: List[Dict[str, Any]], model: str = DEFAULT_MODEL) -> str:
     """Generate an answer using OpenAI based on query and retrieved chunks."""
     client = get_openai_client()
 
@@ -30,25 +31,44 @@ def generate_answer(query: str, retrieved_chunks: List[Dict[str, Any]], model: s
 
     context = "\n\n".join(context_parts)
 
-    # Create the prompt
-    prompt = f"""You are a helpful assistant that answers questions based on the provided context from PDF documents.
+    # Create the user prompt - task-specific content
+    prompt = f"""CONTEXT FROM DOCUMENTS:
+        {context}
 
-Context from documents:
-{context}
+        QUESTION: {query}
 
-Question: {query}
+        Please analyze the above context and provide a comprehensive answer following your instructions.
+    """
 
-Please provide a comprehensive answer based on the context above. If the context doesn't contain enough information to fully answer the question, please say so and provide what information is available. Always cite which sources (by number) you're referencing in your answer."""
+    system_prompt = """You are an expert research analyst specializing in document analysis. Your core capabilities:
+        ANALYSIS APPROACH:
+        - Synthesize information across multiple sources to form complete insights
+        - Identify patterns, connections, and relationships between different pieces of information
+        - Use concrete details, numbers, examples, and direct quotes when available
+        - Think step-by-step through complex questions
+
+        RESPONSE STANDARDS:
+        - Start with a direct, clear answer to the question
+        - Structure responses with clear sections for complex topics
+        - Be honest about information gaps and limitations
+
+        QUALITY MARKERS:
+        - Evidence-based conclusions
+        - Cross-source synthesis
+        - Logical reasoning chains
+        - Precise citations
+        - Professional analysis depth
+    """
 
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are a helpful assistant that answers questions based on provided document context."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=2000
         )
 
         return response.choices[0].message.content
@@ -56,18 +76,24 @@ Please provide a comprehensive answer based on the context above. If the context
     except Exception as e:
         raise Exception(f"Error generating answer: {e}")
 
-def rag_search(search_function, query: str, limit: int = 5, model: str = "gpt-3.5-turbo") -> Dict[str, Any]:
+def rag_search(search_function, query: str, limit: int = 5, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
     """Perform Retrieval-Augmented Generation: search + generate answer."""
+
+    print("🔍 Searching document chunks...")
+
     # Step 1: Retrieve relevant chunks using the provided search function
     retrieved_chunks = search_function(query, limit)
 
     if not retrieved_chunks:
-        return {
+       return {
             'query': query,
             'retrieved_chunks': [],
             'answer': "No relevant documents found to answer your question.",
             'sources': []
         }
+
+    print(f"✅ Found {len(retrieved_chunks)} relevant chunks")
+    print("🤖 Generating AI answer...")
 
     # Step 2: Generate answer using LLM
     answer = generate_answer(query, retrieved_chunks, model)

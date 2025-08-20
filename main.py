@@ -148,7 +148,7 @@ def process_pdf(pdf_path: str, chunk_size: int = CHUNK_SIZE, overlap_size: int =
         'processing_time_seconds': processing_time
     }
 
-def search_documents(query: str, limit: int = 10):
+def search_documents(query: str, limit: int = 10, min_similarity: float = 0.3):
     """Search for similar document chunks."""
     model = get_model()
     normalized_query = normalize_text(query)  # Add this line
@@ -162,9 +162,10 @@ def search_documents(query: str, limit: int = 10):
             SELECT document_path, text, page,
                    1 - (embedding <=> %s::vector) AS similarity
             FROM embeddings
+            WHERE 1 - (embedding <=> %s::vector) >= %s
             ORDER BY embedding <=> %s::vector
             LIMIT %s
-        """, (vector_str, vector_str, limit))
+        """, (vector_str, vector_str, min_similarity, vector_str, limit))
 
         results = cursor.fetchall()
 
@@ -214,10 +215,11 @@ def process(pdf_path, chunk_size, overlap_size):
 @cli.command()
 @click.argument('query', type=str)
 @click.option('--limit', default=10, help='Maximum results')
-def search(query, limit):
+@click.option('--min-similarity', default=0.3, help='Minimum similarity threshold (0.0-1.0)')
+def search(query, limit, min_similarity):
     """Search for similar text chunks."""
     try:
-        results = search_documents(query, limit)
+        results = search_documents(query, limit, min_similarity)
 
         if not results:
             click.echo("No results found.")
@@ -235,11 +237,13 @@ def search(query, limit):
 @cli.command()
 @click.argument('query', type=str)
 @click.option('--limit', default=5, help='Maximum chunks to retrieve')
-@click.option('--model', default='gpt-3.5-turbo', help='OpenAI model to use')
-def answer(query, limit, model):
+@click.option('--model', default='gpt-4o-mini', help='OpenAI model to use')
+@click.option('--min-similarity', default=0.3, help='Minimum similarity threshold (0.0-1.0)')
+def answer(query, limit, model, min_similarity):
     """Get an AI-generated answer based on your PDF documents."""
     try:
-        result = rag_search(search_documents, query, limit, model)
+        search_func = lambda q, l: search_documents(q, l, min_similarity)
+        result = rag_search(search_func, query, limit, model)
 
         click.echo(f"\nQuestion: {result['query']}")
         click.echo("=" * 50)
